@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>DWMY — Calendar + Drive (fixed)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#FBFBFD; --text:#0f1724; --card:#ffffff; --muted:#6b7280; --accent:#F5A623; --accent-strong:#d97706; --radius:12px; --shadow: 0 8px 24px rgba(2,6,23,0.06);} 
+  [data-theme="dark"]{ --bg:#071018; --text:#E6EEF6; --card:#0f1620; --muted:#9aa4b2; --accent:#F5A623; --accent-strong:#d97706; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1200px;margin:20px auto;padding:18px;display:grid;grid-template-columns:300px 1fr;gap:18px}
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid rgba(0,0,0,0.03);padding:14px}
+  .brand{display:flex;gap:12px;align-items:center}
+  .logo{width:46px;height:46px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
+  .muted{color:var(--muted);font-size:13px}
+  .controls{display:flex;gap:8px;align-items:center}
+  button{cursor:pointer;border:0;padding:8px 10px;border-radius:10px;background:transparent;color:var(--text)}
+  .btn-accent{background:var(--accent);color:#fff}
+  .btn-danger{background:#ef4444;color:#fff}
+  .left .years{margin-top:10px;display:flex;flex-direction:column;gap:8px;max-height:58vh;overflow:auto;padding-right:6px}
+  .year-item{padding:10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+  .year-item.active{box-shadow:0 0 0 2px rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.18)}
+  .right{display:flex;flex-direction:column;gap:12px}
+  .row{display:flex;gap:12px;align-items:center}
+  .progress-bg{background:linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.02));height:12px;border-radius:999px;overflow:hidden}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-strong));width:0%;}
+  .grid-months{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .month{padding:12px;border-radius:10px}
+  .month h4{margin:0 0 6px 0}
+  .goal-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+  .small{font-size:13px;color:var(--muted)}
+
+  /* calendar styles */
+  .calendar{width:100%;}
+  .cal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .cal-nav{display:flex;gap:8px;align-items:center}
+  .weekday-row{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
+  .weekday{padding:6px 8px;border-radius:6px;text-align:center;font-weight:600;background:rgba(0,0,0,0.02)}
+  .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .day-cell{min-height:86px;border-radius:8px;padding:8px;background:linear-gradient(180deg,rgba(0,0,0,0.02),transparent);display:flex;flex-direction:column}
+  .day-number{font-weight:700;margin-bottom:6px}
+  .day-badges{margin-top:auto;display:flex;flex-wrap:wrap;gap:6px}
+  .badge{padding:4px 6px;border-radius:999px;font-size:12px;background:var(--accent);color:#fff}
+  .muted-day{color:rgba(0,0,0,0.35)}
+
+  @media (max-width:960px){ .wrap{grid-template-columns:1fr; padding:12px} .grid-months{grid-template-columns:repeat(2,1fr)} }
+  @media (max-width:560px){ .grid-months{grid-template-columns:1fr} .left{order:2} .right{order:1} }
+</style>
+</head>
+<body data-theme="light">
+<div class="wrap">
+  <aside class="card left">
+    <div class="row" style="justify-content:space-between">
+      <div class="brand">
+        <div class="logo">D</div>
+        <div>
+          <div style="font-weight:700">DWMY</div>
+          <div class="muted">Educational goal manager</div>
+        </div>
+      </div>
+      <div class="controls">
+        <label title="Import CSV" style="cursor:pointer">
+          <input id="csvInput" type="file" accept=".csv" style="display:none">📥
+        </label>
+        <button id="driveImportBtn" title="Import from Google Sheet/Drive">📂</button>
+        <button id="themeToggle" title="Toggle theme">🌓</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button id="newYearBtn" class="btn-accent">Create Year</button>
+      <button id="delYearBtn" class="btn-danger">Delete</button>
+    </div>
+    <div style="margin-top:10px;font-weight:600">Available years</div>
+    <div class="years" id="yearsList"><div class="muted">No years — import CSV or create a new year</div></div>
+    <div style="margin-top:auto;margin-top:16px;display:flex;flex-direction:column;gap:8px">
+      <div class="small muted">Tip: years only appear after you import a CSV or create one.</div>
+      <div style="display:flex;gap:8px">
+        <button id="exportBtn">Export CSV</button>
+        <button id="clearBtn">Clear</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="right">
+    <div class="card top" id="headerCard">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:18px">Manage goals — <span id="activeYearLabel">(no year)</span></div>
+          <div class="muted" id="subtitle">Import CSV or create a year to begin.</div>
+        </div>
+        <div style="width:360px;display:flex;gap:8px;align-items:center">
+          <div class="small muted">Year progress</div>
+          <div style="flex:1"><div class="progress-bg"><div id="yearProgress" class="progress-fill"></div></div></div>
+          <div id="yearPct" class="small muted" style="width:44px;text-align:right">0%</div>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-weight:700">Yearly Goals</div>
+        <div style="display:flex;gap:8px;align-items:center"><button id="addYearGoalBtn" class="btn-accent">+ Add</button></div>
+      </div>
+      <div id="yearlyGoalsList"></div>
+    </section>
+
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-weight:700">Monthly Overview</div>
+        <div class="small muted">Click a month to open calendar view</div>
+      </div>
+      <div id="monthsGrid" class="grid-months"></div>
+    </section>
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+const STORAGE_KEY = 'dwmy_full_v1';
+let DB = { years: {} };
+let state = { activeYear: null };
+
+/* persistence */
+function loadDB(){ try{ const raw = localStorage.getItem(STORAGE_KEY); if(raw) DB = JSON.parse(raw); }catch(e){ DB = { years:{} }; } }
+function saveDB(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(e){ console.error('Failed to save DB', e); } }
+function ensureYearStructure(y){ if(!DB.years[y]){ const months={}; for(let m=1;m<=12;m++) months[m] = { id:m, monthlyGoals: [], notes:'', days:{} }; DB.years[y] = { year: Number(y), yearlyGoals: [], months }; saveDB(); } }
+function uid(prefix='id'){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
+
+/* UI elements */
+const yearsList = document.getElementById('yearsList');
+const activeYearLabel = document.getElementById('activeYearLabel');
+const subtitle = document.getElementById('subtitle');
+const yearProgress = document.getElementById('yearProgress');
+const yearPct = document.getElementById('yearPct');
+const monthsGrid = document.getElementById('monthsGrid');
+const yearlyGoalsList = document.getElementById('yearlyGoalsList');
+const modalRoot = document.getElementById('modalRoot');
+const csvInput = document.getElementById('csvInput');
+const newYearBtn = document.getElementById('newYearBtn');
+const delYearBtn = document.getElementById('delYearBtn');
+const exportBtn = document.getElementById('exportBtn');
+const clearBtn = document.getElementById('clearBtn');
+const themeToggle = document.getElementById('themeToggle');
+const addYearGoalBtn = document.getElementById('addYearGoalBtn');
+const driveImportBtn = document.getElementById('driveImportBtn');
+
+/* rendering */
+function renderYears(){ yearsList.innerHTML=''; const keys = Object.keys(DB.years).sort((a,b)=>b-a); if(keys.length===0){ yearsList.innerHTML='<div class="muted">No years — import CSV or create a new year</div>'; activeYearLabel.textContent='(no year)'; subtitle.textContent='Import CSV or create a year to begin.'; return; } keys.forEach(y=>{ const el=document.createElement('div'); el.className='year-item'; if(Number(y)===Number(state.activeYear)) el.classList.add('active'); el.innerHTML=`<div style="font-weight:600">${y}</div><div class="small muted">${(DB.years[y].yearlyGoals||[]).length} goals</div>`; el.onclick=()=> setActiveYear(Number(y)); yearsList.appendChild(el); }); }
+function setActiveYear(y){ ensureYearStructure(y); state.activeYear = Number(y); activeYearLabel.textContent = state.activeYear; const yg = DB.years[state.activeYear].yearlyGoals||[]; const dayEntries = Object.values(DB.years[state.activeYear].months).reduce((s,m)=> s + Object.keys(m.days||{}).length,0); subtitle.textContent = `${yg.length} yearly goals · ${dayEntries} day entries`; renderAll(); }
+function renderYearlyGoals(){ yearlyGoalsList.innerHTML=''; if(!state.activeYear) return; const arr = DB.years[state.activeYear].yearlyGoals; if(!arr.length){ yearlyGoalsList.innerHTML='<div class="muted">No yearly goals</div>'; return; } arr.forEach(g=>{ const d=document.createElement('div'); d.className='row'; d.style.justifyContent='space-between'; d.style.marginBottom='8px'; d.innerHTML = `<div><div style="font-weight:600">${escapeHtml(g.title)}</div><div class="small muted">${escapeHtml(g.notes||'')}</div></div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><div class="small muted">${g.progress||0}%</div><div style="display:flex;gap:6px"><button data-act="edit-yearly" data-id="${g.id}">Edit</button><button data-act="del-yearly" data-id="${g.id}">Delete</button></div></div>`; yearlyGoalsList.appendChild(d); }); }
+function calcMonthProgress(y,m){ const mo = DB.years[y].months[m]; const goals = mo.monthlyGoals||[]; if(goals.length===0) return 0; const done = goals.filter(g=>g.done).length; return Math.round(done/goals.length*100); }
+function calcYearProgress(y){ const vals=[]; for(let m=1;m<=12;m++) vals.push(calcMonthProgress(y,m)); if(vals.length===0) return 0; const sum=vals.reduce((s,v)=>s+v,0); return Math.round(sum/vals.length); }
+function renderMonths(){ monthsGrid.innerHTML=''; if(!state.activeYear) return; const monthsNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; for(let m=1;m<=12;m++){ const mo=DB.years[state.activeYear].months[m]; const filledDays=Object.keys(mo.days||{}).length; const progress=calcMonthProgress(state.activeYear,m); const el=document.createElement('div'); el.className='month card'; el.innerHTML = `<h4>${monthsNames[m-1]} <span class="small muted">(${filledDays} days)</span></h4><div class="progress-bg" style="margin-bottom:8px"><div class="progress-fill" style="width:${progress}%"></div></div><div style="display:flex;justify-content:space-between;align-items:center"><div class="small muted">${progress}%</div><div style="display:flex;gap:8px"><button data-act="open-month" data-m="${m}">Open</button><button data-act="add-month-goal" data-m="${m}">+Goal</button></div></div>`; monthsGrid.appendChild(el); } }
+function renderAll(){ renderYears(); renderYearlyGoals(); renderMonths(); renderYearProgress(); }
+function renderYearProgress(){ if(!state.activeYear){ yearProgress.style.width='0%'; yearPct.textContent='0%'; return; } const p = calcYearProgress(state.activeYear); yearProgress.style.width = p + '%'; yearPct.textContent = p + '%'; }
+
+/* events */
+newYearBtn.addEventListener('click', ()=>{ const year = prompt('Create DWMY for year (e.g. 2026):'); if(!year) return; if(DB.years[year]) return alert('Year already exists'); ensureYearStructure(year); setActiveYear(Number(year)); saveDB(); });
+delYearBtn.addEventListener('click', ()=>{ if(!state.activeYear) return alert('No active year'); if(!confirm(`Delete ${state.activeYear} and all its data?`)) return; delete DB.years[state.activeYear]; state.activeYear=null; saveDB(); renderAll(); });
+clearBtn.addEventListener('click', ()=>{ if(!confirm('Clear all stored data?')) return; DB={years:{}}; state.activeYear=null; saveDB(); renderAll(); });
+themeToggle.addEventListener('click', ()=>{ const root=document.body; root.setAttribute('data-theme', root.getAttribute('data-theme')==='dark'?'light':'dark'); });
+csvInput.addEventListener('change',(e)=>{ const file=e.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=()=>{ try{ importCSV(reader.result); alert('Import complete'); }catch(err){ alert('CSV parse error'); console.error(err); } e.target.value=''; }; reader.readAsText(file,'utf-8'); });
+exportBtn.addEventListener('click', ()=>{ if(!state.activeYear) return alert('Select a year first'); const csv = generateCSV(state.activeYear); const blob = new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`dwmy_${state.activeYear}.csv`; a.click(); URL.revokeObjectURL(url); });
+addYearGoalBtn.addEventListener('click', ()=>{ if(!state.activeYear) return alert('Select/create a year first'); openYearlyGoalModal(); });
+document.addEventListener('click',(e)=>{ const t=e.target; if(!t.dataset) return; if(t.dataset.act==='open-month'){ const m=Number(t.dataset.m); openMonthModal(state.activeYear,m); } if(t.dataset.act==='add-month-goal'){ const m=Number(t.dataset.m); openAddMonthGoalModal(state.activeYear,m); } if(t.dataset.act==='del-yearly'){ const id=t.dataset.id; const arr=DB.years[state.activeYear].yearlyGoals; const idx=arr.findIndex(x=>x.id===id); if(idx>-1){ arr.splice(idx,1); saveDB(); renderYearlyGoals(); renderYearProgress(); } } if(t.dataset.act==='edit-yearly'){ const id=t.dataset.id; const g=DB.years[state.activeYear].yearlyGoals.find(x=>x.id===id); if(g) openYearlyGoalModal(g); } });
+
+/* Month calendar view */
+function openMonthModal(year,m){ const modal = createModal(); modal.classList.add('calendar'); let viewY = year, viewM = m; function monthTitle(y,mm){ return new Date(y,mm-1,1).toLocaleString(undefined,{month:'long',year:'numeric'}); }
+  function build(){ modal.innerHTML = `<div class="cal-header"><div style="font-weight:700">${monthTitle(viewY,viewM)}</div><div class="cal-nav"><button id="calPrev">◀</button><button id="calNext">▶</button><button id="calClose">Close</button></div></div><div class="weekday-row">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(w=>`<div class="weekday">${w}</div>`).join('')}</div><div id="calGrid" class="calendar-grid"></div><div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center"><div class="small muted">Click a day to open</div><div><button id="addMonthGoalInline" class="btn-accent">+Monthly Goal</button></div></div>`; renderGrid(); }
+  function daysInMonth(y,mm){ return new Date(y,mm,0).getDate(); }
+  function renderGrid(){ const grid = modal.querySelector('#calGrid'); grid.innerHTML=''; const firstDow = new Date(viewY,viewM-1,1).getDay(); const total = daysInMonth(viewY,viewM); // blanks
+    for(let i=0;i<firstDow;i++){ const empty=document.createElement('div'); empty.className='day-cell muted-day'; grid.appendChild(empty); }
+    for(let d=1; d<=total; d++){ const cell=document.createElement('div'); cell.className='day-cell'; const dayData = (DB.years[viewY] && DB.years[viewY].months[viewM] && DB.years[viewY].months[viewM].days && DB.years[viewY].months[viewM].days[d]) || null; const goalsCount = dayData ? (dayData.goals||[]).length : 0; const tasksCount = dayData ? (dayData.tasks||[]).length : 0; const badges = []; if(goalsCount) badges.push(`<div class="badge">G:${goalsCount}</div>`); if(tasksCount) badges.push(`<div class="badge">T:${tasksCount}</div>`); const progress = dayData && dayData.progress ? `${dayData.progress}%` : ''; cell.innerHTML = `<div class="day-number">${d}</div><div class="small muted">${progress}</div><div class="day-badges">${badges.join('')}</div>`; cell.onclick = ()=> { openDayModal(viewY, viewM, d); build(); }; grid.appendChild(cell); }
+  }
+  build(); modal.querySelector('#calPrev').onclick = ()=>{ if(viewM===1){ viewM=12; viewY -=1; } else viewM -=1; build(); };
+  modal.querySelector('#calNext').onclick = ()=>{ if(viewM===12){ viewM=1; viewY +=1; } else viewM +=1; build(); };
+  modal.querySelector('#calClose').onclick = ()=> closeModal();
+  modal.querySelector('#addMonthGoalInline').onclick = ()=>{ const t = prompt('Monthly goal title:'); if(!t) return; ensureYearStructure(year); DB.years[year].months[m].monthlyGoals.push({ id:uid('mm'), title:t, done:false }); saveDB(); renderAll(); alert('Monthly goal added'); };
+}
+
+/* Day editor */
+function openDayModal(year,month,day){ ensureYearStructure(year); const mo = DB.years[year].months[month]; if(!mo.days[day]) mo.days[day] = { id:day, goals:[], tasks:[], expense:0, progress:0, notes:'' }; const dd = mo.days[day]; const modal = createModal(); modal.innerHTML = `<h3>Day — ${month}/${day}/${year}</h3><div style="display:flex;gap:12px;margin-top:8px"><div style="flex:1"><div style="font-weight:600;margin-bottom:8px">Daily goals</div><div id="dgList" style="display:flex;flex-direction:column;gap:8px;max-height:180px;overflow:auto"></div><div style="display:flex;gap:8px;margin-top:8px"><input id="dgNew" placeholder="New daily goal"><button id="dgAdd" class="btn-accent">Add</button></div><div style="margin-top:12px;font-weight:600">Tasks</div><div id="taskList" style="display:flex;flex-direction:column;gap:8px;max-height:140px;overflow:auto"></div><div style="display:flex;gap:8px;margin-top:8px"><input id="taskNew" placeholder="Task title"><button id="taskAdd" class="btn-accent">Add</button></div></div><div style="width:260px"><div style="font-weight:600;margin-bottom:8px">Expense</div><input id="dayExpense" value="${escapeHtml(dd.expense||0)}"><div style="font-weight:600;margin-top:12px;margin-bottom:8px">Notes</div><textarea id="dayNotes" style="height:180px">${escapeHtml(dd.notes||'')}</textarea></div></div><div style="display:flex;justify-content:space-between;margin-top:12px"><div class="small muted">Day progress: <span id="dProg">${dd.progress||0}%</span></div><div style="display:flex;gap:8px"><button id="dClose">Close</button><button id="dSave" class="btn-accent">Save</button></div></div>`;
+  function refresh(){ const gList = modal.querySelector('#dgList'); gList.innerHTML=''; dd.goals.forEach((g,i)=>{ const r=document.createElement('div'); r.style.display='flex'; r.style.gap='8px'; r.innerHTML = `<input type="checkbox" ${g.done? 'checked':''} data-i="${i}" class="dg-check"><div class="title">${escapeHtml(g.title)}</div><div style="margin-left:auto"><button class="dg-del" data-i="${i}">Del</button></div>`; gList.appendChild(r); }); const tList = modal.querySelector('#taskList'); tList.innerHTML=''; dd.tasks.forEach((t,i)=>{ const r=document.createElement('div'); r.style.display='flex'; r.style.gap='8px'; r.innerHTML = `<div class="title">${escapeHtml(t.title)}</div><div style="margin-left:auto"><button class="task-del" data-i="${i}">Del</button></div>`; tList.appendChild(r); }); modal.querySelector('#dProg').textContent = dd.progress || 0; }
+  modal.querySelector('#dgAdd').onclick = ()=>{ const v = modal.querySelector('#dgNew').value.trim(); if(!v) return; dd.goals.push({ id:uid('dg'), title:v, done:false }); modal.querySelector('#dgNew').value=''; saveDB(); refresh(); renderYearProgress(); };
+  modal.querySelector('#taskAdd').onclick = ()=>{ const v = modal.querySelector('#taskNew').value.trim(); if(!v) return; dd.tasks.push({ id:uid('t'), title:v, notes:'' }); modal.querySelector('#taskNew').value=''; saveDB(); refresh(); renderYearProgress(); };
+  modal.addEventListener('click',(ev)=>{ if(ev.target.matches('.dg-check')){ const i=Number(ev.target.dataset.i); dd.goals[i].done = ev.target.checked; saveDB(); refresh(); renderYearProgress(); } if(ev.target.matches('.dg-del')){ const i=Number(ev.target.dataset.i); dd.goals.splice(i,1); saveDB(); refresh(); renderYearProgress(); } if(ev.target.matches('.task-del')){ const i=Number(ev.target.dataset.i); dd.tasks.splice(i,1); saveDB(); refresh(); renderYearProgress(); } });
+  modal.querySelector('#dClose').onclick = ()=> closeModal();
+  modal.querySelector('#dSave').onclick = ()=>{ dd.expense = Number(modal.querySelector('#dayExpense').value || 0); dd.notes = modal.querySelector('#dayNotes').value || ''; const total = dd.goals.length || 1; const done = dd.goals.filter(g=>g.done).length; dd.progress = Math.round((done/total)*100); saveDB(); closeModal(); renderAll(); };
+  refresh(); }
+
+/* Yearly goal modal */
+function openYearlyGoalModal(existing=null){ const modal=createModal(); modal.innerHTML = `<h3>${existing? 'Edit':'Add'} yearly goal</h3><div style="margin-top:8px"><input id="ygTitle" placeholder="Title" value="${existing? escapeHtml(existing.title):''}"><textarea id="ygNotes" style="margin-top:8px" placeholder="Notes">${existing? escapeHtml(existing.notes||'') : ''}</textarea></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button id="ygCancel">Cancel</button><button id="ygSave" class="btn-accent">Save</button></div>`; modal.querySelector('#ygCancel').onclick = ()=> closeModal(); modal.querySelector('#ygSave').onclick = ()=>{ const t=modal.querySelector('#ygTitle').value.trim(); const notes=modal.querySelector('#ygNotes').value.trim(); if(!t) return alert('Title required'); if(existing){ existing.title=t; existing.notes=notes; } else { ensureYearStructure(state.activeYear||new Date().getFullYear()); DB.years[state.activeYear].yearlyGoals.push({ id:uid('yg'), title:t, notes, progress:0 }); } saveDB(); closeModal(); renderAll(); }; }
+
+/* CSV parsing / import */
+function parseCSV(text){ const rows=[]; let cur=''; let row=[]; let inQ=false; for(let i=0;i<text.length;i++){ const ch=text[i], nxt=text[i+1]; if(ch==='"'){ if(inQ && nxt==='"'){ cur+='"'; i++; } else inQ = !inQ; } else if(ch===',' && !inQ){ row.push(cur); cur=''; } else if((ch==='\n' || ch==='\r') && !inQ){ if(cur!=='' || row.length){ row.push(cur); rows.push(row); row=[]; cur=''; } } else cur+=ch; } if(cur!==''||row.length) row.push(cur), rows.push(row); if(rows.length===0) return; const header = rows[0].map(h=>h.trim().toLowerCase()); const idx = name => header.indexOf(name.toLowerCase()); const typeI = idx('type'), titleI = idx('title'), notesI = idx('notes'), dateI = idx('date'), startI = idx('start'), endI = idx('end'), expenseI = idx('expense'), statusI = idx('status'), yearI = idx('year'), monthI = idx('month'); const yearsFound = new Set(); for(let r=1;r<rows.length;r++){ const cells = rows[r].map(c=>c.trim()); if(!cells.length) continue; const type = (cells[typeI]||'').toLowerCase(); const title = cells[titleI]||''; const notes = cells[notesI]||''; let year=null, month=null; if(yearI>=0 && cells[yearI]) year = Number(cells[yearI]); if(monthI>=0 && cells[monthI]) month = Number(cells[monthI]); if(!year && cells[dateI]){ const d = new Date(cells[dateI]); if(!isNaN(d)) year = d.getFullYear(), month = month || (d.getMonth()+1); } if(!year) continue; yearsFound.add(String(year)); ensureYearStructure(year); const yObj = DB.years[year]; if(type.includes('yearly')){ yObj.yearlyGoals.push({ id:uid('yg'), title, notes, progress:0 }); } else if(type.includes('monthly')){ const m = month || 1; yObj.months[m].monthlyGoals.push({ id:uid('mm'), title, done:false }); } else if(type.includes('daily')){ const d = new Date(cells[dateI]); if(isNaN(d)) continue; const mm = d.getMonth()+1, dd = d.getDate(); if(!yObj.months[mm].days[dd]) yObj.months[mm].days[dd] = { id:dd, goals:[], tasks:[], expense: Number(cells[expenseI]||0), progress:0, notes:'' }; yObj.months[mm].days[dd].goals.push({ id:uid('dg'), title }); } else if(type.includes('task')){ const d = new Date(cells[dateI]); if(isNaN(d)) continue; const mm = d.getMonth()+1, dd = d.getDate(); if(!yObj.months[mm].days[dd]) yObj.months[mm].days[dd] = { id:dd, goals:[], tasks:[], expense: Number(cells[expenseI]||0), progress:0, notes:'' }; yObj.months[mm].days[dd].tasks.push({ id:uid('t'), title, start: cells[startI]||'', end: cells[endI]||'', notes }); } }
+  saveDB(); if(yearsFound.size){ const arr = Array.from(yearsFound).sort((a,b)=>b-a); setActiveYear(Number(arr[0])); } }
+function importCSV(text){ parseCSV(text); renderAll(); }
+function generateCSV(y){ const rows=[['Type','Title','Notes','Date','Start','End','Expense','Status','Year','Month']]; const yearObj = DB.years[y]; if(!yearObj) return ''; yearObj.yearlyGoals.forEach(g=> rows.push(['Yearly Goal', g.title||'', g.notes||'', '', '', '', '', g.status||'', y, ''])); for(let m=1;m<=12;m++){ const mo = yearObj.months[m]; (mo.monthlyGoals||[]).forEach(g=> rows.push(['Monthly Goal', g.title||'', '', '', '', '', '', g.done? 'done':'' , y, m])); for(const dKey in mo.days){ const day = mo.days[dKey]; (day.goals||[]).forEach(gd => rows.push(['Daily Goal', gd.title||'', '', `${m}/${dKey}/${y}`, '', '', day.expense||0, '', y, m])); (day.tasks||[]).forEach(t => rows.push(['Task', t.title||'', t.notes||'', `${m}/${dKey}/${y}`, t.start||'', t.end||'', day.expense||0, '', y, m])); } } return rows.map(r=> r.map(c=>`"${String(c||'').replace(/"/g,'""') }"`).join(',')).join('\n'); }
+
+/* Drive/Sheet fetch helpers */
+function normalizeToCsvUrl(url){ if(!url) return null; try{ url = url.trim(); const sheetMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/); if(sheetMatch) return `https://docs.google.com/spreadsheets/d/${sheetMatch[1]}/export?format=csv`; const driveMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/); if(driveMatch) return `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`; const openMatch = url.match(/[?&]id=([a-zA-Z0-9-_]+)/); if(openMatch) return `https://drive.google.com/uc?export=download&id=${openMatch[1]}`; if(url.includes('export?format=csv') || url.includes('uc?export=download') || url.endsWith('.csv')) return url; return null; }catch(e){ return null; } }
+
+function fetchWithTimeout(url, opts={}, timeout=12000){ return new Promise((resolve,reject)=>{ const timer = setTimeout(()=>reject(new Error('Timeout')), timeout); fetch(url, opts).then(r=>{ clearTimeout(timer); resolve(r); }).catch(err=>{ clearTimeout(timer); reject(err); }); }); }
+
+async function tryFetchCsvCandidate(url){ try{ const res = await fetchWithTimeout(url, { mode: 'cors' }, 12000); if(!res.ok) throw new Error('status ' + res.status); const text = await res.text(); if(!text || text.length < 10) throw new Error('empty'); return text; }catch(e){ throw e; } }
+
+async function fetchAndImportCsvUrl(rawUrl){ const normalized = normalizeToCsvUrl(rawUrl); if(!normalized) throw new Error('Unrecognized URL format'); // try common variants
+  const attempts = [];
+  if(normalized.includes('/export?format=csv')){
+    attempts.push(normalized);
+    const gidMatch = rawUrl.match(/[?&]gid=(\d+)/);
+    const sheetIdMatch = rawUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if(sheetIdMatch){ const gid = gidMatch ? gidMatch[1] : '0'; attempts.push(`https://docs.google.com/spreadsheets/d/${sheetIdMatch[1]}/pub?gid=${gid}&single=true&output=csv`); }
+  } else if(normalized.includes('drive.google.com')){
+    attempts.push(normalized);
+  } else { attempts.push(normalized); }
+
+  let lastErr = null;
+  for(const u of attempts){ try{ const txt = await tryFetchCsvCandidate(u); if(!csvLooksLikeDWMY(txt)){ const proceed = confirm('Remote CSV headers don\'t look like DWMY (missing Title/Type/Year). Continue import?'); if(!proceed) throw new Error('User cancelled header mismatch'); }
+      importCSV(txt); return; }catch(err){ lastErr = err; console.warn('Attempt failed', u, err); }
+  }
+  throw lastErr || new Error('All attempts failed'); }
+
+function csvLooksLikeDWMY(text){ const first = (text||'').split(/\r?\n/)[0]||''; const keys = first.toLowerCase(); return keys.includes('title') || keys.includes('type') || keys.includes('year') || keys.includes('month'); }
+
+/* drive import UI */
+driveImportBtn.addEventListener('click', async ()=>{ const url = prompt('Paste Google Sheet or Drive file link (shareable):'); if(!url) return; try{ modalNotice('Fetching remote CSV...'); await fetchAndImportCsvUrl(url); modalNotice('Import complete'); alert('Imported remote CSV'); }catch(err){ modalNotice('Remote import failed'); alert('Failed to fetch/import: ' + (err && err.message ? err.message : err)); console.error(err); } });
+
+/* small notice modal */
+function modalNotice(msg){ modalRoot.innerHTML = ''; const wrap = document.createElement('div'); wrap.style.position='fixed'; wrap.style.inset='0'; wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.justifyContent='center'; wrap.style.background='rgba(2,6,23,0.12)'; wrap.style.zIndex=999; const card=document.createElement('div'); card.className='card'; card.style.padding='18px'; card.textContent = msg; wrap.appendChild(card); modalRoot.appendChild(wrap); setTimeout(()=>{ if(modalRoot.contains(wrap)) modalRoot.removeChild(wrap); }, 2000); }
+
+/* simple modal helpers */
+function createModal(){ modalRoot.innerHTML=''; const wrap=document.createElement('div'); wrap.style.position='fixed'; wrap.style.inset='0'; wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.justifyContent='center'; wrap.style.background='rgba(2,6,23,0.45)'; wrap.style.zIndex=999; const inner=document.createElement('div'); inner.className='card'; inner.style.width='min(920px,96%)'; wrap.appendChild(inner); modalRoot.appendChild(wrap); return inner; }
+function closeModal(){ modalRoot.innerHTML=''; }
+function escapeHtml(s){ if(s===undefined || s===null) return ''; return String(s).replace(/[&<>\"]/g, ch=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
+
+/* init */
+loadDB(); renderAll();
+
+/* expose debug helpers */
+window.__dwmy = { DB, saveDB, setActiveYear, ensureYearStructure, fetchAndImportCsvUrl };
+</script>
+</body>
+</html>
